@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { delay } from '../utils/delay';
 
 const AuthContext = createContext();
@@ -121,6 +121,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isInitialized = useRef(false);
 
   // Load user from localStorage on app start
   useEffect(() => {
@@ -136,6 +137,7 @@ export const AuthProvider = ({ children }) => {
           console.warn('[Auth] Detected invalid cached user data. Clearing localStorage...');
           localStorage.removeItem('jobPortalUser');
           localStorage.removeItem('authToken');
+          isInitialized.current = true;
           setIsLoading(false);
           return;
         }
@@ -147,11 +149,17 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('authToken');
       }
     }
+    isInitialized.current = true;
     setIsLoading(false);
   }, []);
 
-  // Save user to localStorage whenever user changes
+  // Save user to localStorage whenever user changes.
+  // Guard against the initial render where user is null but localStorage
+  // has not yet been read — without this guard, Effect 2 fires before
+  // Effect 1 completes its setUser call and wipes the saved session.
   useEffect(() => {
+    if (!isInitialized.current) return;
+
     if (user) {
       localStorage.setItem('jobPortalUser', JSON.stringify(user));
     } else {
